@@ -73,49 +73,49 @@ public class WriteAPI {
     /// Write time-series data into InfluxDB.
     ///
     /// - Parameters:
+    ///   - record: The record to write.
     ///   - bucket:  The destination bucket for writes. Takes either the `ID` or `Name` interchangeably.
     ///   - org: The destination organization for writes. Takes either the `ID` or `Name` interchangeably.
     ///   - precision: The precision for the unix timestamps within the body line-protocol.
-    ///   - record: The record to write. It can be `String`,  `Point` or `Tuple`.
     ///   - responseQueue: The queue on which api response is dispatched.
     ///   - completion: completion handler to receive the data and the error objects
     ///
     /// - SeeAlso: https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/
-    public func writeRecord(bucket: String? = nil,
-                            org: String? = nil,
-                            precision: InfluxDBClient.TimestampPrecision? = nil,
-                            record: Any,
-                            responseQueue: DispatchQueue = .main,
-                            completion: @escaping (_ response: Void?,
-                                                   _ error: InfluxDBClient.InfluxDBError?) -> Void) {
-        self.writeRecords(
-                bucket: bucket,
-                org: org,
-                precision: precision,
-                records: [record],
-                responseQueue: responseQueue,
-                completion: completion)
+    public func write(record: InfluxDBClient.Point,
+                      bucket: String? = nil,
+                      org: String? = nil,
+                      precision: InfluxDBClient.TimestampPrecision? = nil,
+                      responseQueue: DispatchQueue = .main,
+                      completion: @escaping (_ response: Void?,
+                                             _ error: InfluxDBClient.InfluxDBError?) -> Void) {
+        self.write(
+            records: [record],
+            bucket: bucket,
+            org: org,
+            precision: precision,
+            responseQueue: responseQueue,
+            completion: completion)
     }
 
     /// Write time-series data into InfluxDB.
     ///
     /// - Parameters:
+    ///   - records: The records to write.
     ///   - bucket:  The destination bucket for writes. Takes either the `ID` or `Name` interchangeably.
     ///   - org: The destination organization for writes. Takes either the `ID` or `Name` interchangeably.
     ///   - precision: The precision for the unix timestamps within the body line-protocol.
-    ///   - records: The records to write. It can be `String`,  `Point` or `Tuple`.
     ///   - responseQueue: The queue on which api response is dispatched.
     ///   - completion: handler to receive the data and the error objects
     ///
     /// - SeeAlso: https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/
-    public func writeRecords(bucket: String? = nil,
-                             org: String? = nil,
-                             precision: InfluxDBClient.TimestampPrecision? = nil,
-                             records: [Any],
-                             responseQueue: DispatchQueue = .main,
-                             completion: @escaping (_ response: Void?,
-                                                    _ error: InfluxDBClient.InfluxDBError?) -> Void) {
-        postWrite(bucket, org, precision, records, responseQueue) { result -> Void in
+    public func write(records: [InfluxDBClient.Point],
+                      bucket: String? = nil,
+                      org: String? = nil,
+                      precision: InfluxDBClient.TimestampPrecision? = nil,
+                      responseQueue: DispatchQueue = .main,
+                      completion: @escaping (_ response: Void?,
+                                             _ error: InfluxDBClient.InfluxDBError?) -> Void) {
+        postWrite(bucket, org, precision, records, responseQueue) { result in
             switch result {
             case .success:
                 completion((), nil)
@@ -125,107 +125,50 @@ public class WriteAPI {
         }
     }
 
-    /// Write time-series data into InfluxDB.
-    ///
-    /// - Parameters:
-    ///   - bucket:  The destination bucket for writes. Takes either the `ID` or `Name` interchangeably.
-    ///   - org: The destination organization for writes. Takes either the `ID` or `Name` interchangeably.
-    ///   - precision: The precision for the unix timestamps within the body line-protocol.
-    ///   - record: The record to write. It can be `String`,  `Point` or `Tuple`.
-    ///   - responseQueue: The queue on which api response is dispatched.
-    ///   - completion: completion handler to receive the `Swift.Result`
-    ///
-    /// - SeeAlso: `Swift.Result`
-    /// - SeeAlso: https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/
-    public func writeRecord(bucket: String? = nil,
-                            org: String? = nil,
-                            precision: InfluxDBClient.TimestampPrecision? = nil,
-                            record: Any,
-                            responseQueue: DispatchQueue = .main,
-                            completion: @escaping (
-                                    _ result: Swift.Result<Void, InfluxDBClient.InfluxDBError>) -> Void) {
-        self.writeRecords(
-                bucket: bucket,
-                org: org,
-                precision: precision,
-                records: [record],
-                responseQueue: responseQueue,
-                completion: completion)
-    }
-
-    /// Write time-series data into InfluxDB.
-    ///
-    /// - Parameters:
-    ///   - bucket:  The destination bucket for writes. Takes either the `ID` or `Name` interchangeably.
-    ///   - org: The destination organization for writes. Takes either the `ID` or `Name` interchangeably.
-    ///   - precision: The precision for the unix timestamps within the body line-protocol.
-    ///   - records: The records to write. It can be `String`,  `Point` or `Tuple`.
-    ///   - responseQueue: The queue on which api response is dispatched.
-    ///   - completion: completion handler to receive the `Swift.Result`
-    ///
-    /// - SeeAlso: `Swift.Result`
-    /// - SeeAlso: https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/
-    public func writeRecords(bucket: String? = nil,
-                             org: String? = nil,
-                             precision: InfluxDBClient.TimestampPrecision? = nil,
-                             records: [Any],
-                             responseQueue: DispatchQueue = .main,
-                             completion: @escaping (
-                                     _ result: Swift.Result<Void, InfluxDBClient.InfluxDBError>) -> Void) {
-        postWrite(bucket, org, precision, records, responseQueue) { result -> Void in
-            switch result {
-            case .success:
-                completion(.success(()))
-            case let .failure(error):
-                completion(.failure(error))
-            }
-        }
-    }
-
     #if canImport(Combine)
     /// Write time-series data into InfluxDB.
     ///
     /// - Parameters:
+    ///   - record: The record to write.
     ///   - bucket:  The destination bucket for writes. Takes either the `ID` or `Name` interchangeably.
     ///   - org: The destination organization for writes. Takes either the `ID` or `Name` interchangeably.
     ///   - precision: The precision for the unix timestamps within the body line-protocol.
-    ///   - record: The record to write. It can be `String`,  `Point` or `Tuple`.
     ///   - responseQueue: The queue on which api response is dispatched.
     /// - Returns: Publisher to attach a subscriber
     ///
     /// - SeeAlso: https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/
     @available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
-    public func writeRecord(bucket: String? = nil,
+    public func writeRecord(record: InfluxDBClient.Point,
+                            bucket: String? = nil,
                             org: String? = nil,
                             precision: InfluxDBClient.TimestampPrecision? = nil,
-                            record: Any,
                             responseQueue: DispatchQueue = .main) -> AnyPublisher<Void, InfluxDBClient.InfluxDBError> {
         self.writeRecords(
-                bucket: bucket,
-                org: org,
-                precision: precision,
-                records: [record],
-                responseQueue: responseQueue)
+            records: [record],
+            bucket: bucket,
+            org: org,
+            precision: precision,
+            responseQueue: responseQueue)
     }
 
     /// Write time-series data into InfluxDB.
     ///
     /// - Parameters:
+    ///   - records: The records to write.
     ///   - bucket:  The destination bucket for writes. Takes either the `ID` or `Name` interchangeably.
     ///   - org: The destination organization for writes. Takes either the `ID` or `Name` interchangeably.
     ///   - precision: The precision for the unix timestamps within the body line-protocol.
-    ///   - records: The records to write. It can be `String`,  `Point` or `Tuple`.
     ///   - responseQueue: The queue on which api response is dispatched.
     /// - Returns: Publisher to attach a subscriber
     ///
     /// - SeeAlso: https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/
     @available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
-    public func writeRecords(bucket: String? = nil,
+    public func writeRecords(records: [InfluxDBClient.Point],
+                             bucket: String? = nil,
                              org: String? = nil,
                              precision: InfluxDBClient.TimestampPrecision? = nil,
-                             records: [Any],
                              responseQueue: DispatchQueue = .main)
-                    -> AnyPublisher<Void, InfluxDBClient.InfluxDBError> {
+            -> AnyPublisher<Void, InfluxDBClient.InfluxDBError> {
         Future<Void, InfluxDBClient.InfluxDBError> { promise in
             self.postWrite(bucket, org, precision, records, responseQueue) { result -> Void in
                 switch result {
@@ -235,7 +178,8 @@ public class WriteAPI {
                     promise(.failure(error))
                 }
             }
-        }.eraseToAnyPublisher()
+        }
+            .eraseToAnyPublisher()
     }
     #endif
 
@@ -243,121 +187,68 @@ public class WriteAPI {
     private func postWrite(_ bucket: String?,
                            _ org: String?,
                            _ precision: InfluxDBClient.TimestampPrecision?,
-                           _ records: [Any],
+                           _ records: [InfluxDBClient.Point],
                            _ responseQueue: DispatchQueue,
-                           _ completion: @escaping (
-                                   _ result: Swift.Result<Void, InfluxDBClient.InfluxDBError>) -> Void) {
+                           _ completion: @escaping
+                           (_ result: Swift.Result<Void, InfluxDBClient.InfluxDBError>) -> Void) {
+        var components = URLComponents(string: client.url + "/api/v2/write")
+
+        guard let bucket = bucket ?? client.options.bucket else {
+            completion(.failure(.generic("The bucket destination should be specified.")))
+            return
+        }
+
+        guard let org = org ?? client.options.org else {
+            completion(.failure(.generic("The org destination should be specified.")))
+            return
+        }
+
+        let precision = precision ?? client.options.precision
+
+        // we need sort batches by insertion time (for LP without timestamp)
+        let defaultTags = pointSettings?.evaluate()
         do {
-            var components = URLComponents(string: client.url + "/api/v2/write")
-
-            guard let bucket = bucket ?? client.options.bucket else {
-                throw InfluxDBClient.InfluxDBError
-                        .generic("The bucket destination should be specified.")
+            let lines = try toLineProtocol(records: records, precision: precision, defaultTags: defaultTags)
+            guard let body = lines
+                .joined(separator: "\n")
+                .data(using: .utf8)
+                else {
+                completion(.failure(InfluxDBClient.InfluxDBError.generic("points contain invalid UTF-8")))
+                return
             }
 
-            guard let org = org ?? client.options.org else {
-                throw InfluxDBClient.InfluxDBError
-                        .generic("The org destination should be specified.")
-            }
+            components?.queryItems = [
+                URLQueryItem(name: "bucket", value: bucket),
+                URLQueryItem(name: "org", value: org),
+                URLQueryItem(name: "precision", value: precision.rawValue)
+            ]
 
-            let precision = precision ?? client.options.precision
-
-            // we need sort batches by insertion time (for LP without timestamp)
-            var batches: [InfluxDBClient.TimestampPrecision: (Int, [String])] = [:]
-            let defaultTags = pointSettings?.evaluate()
-            try toLineProtocol(precision: precision, any: records, defaultTags: defaultTags, batches: &batches)
-
-            batches.sorted {
-                $0.value.0 < $1.value.0
-            }.forEach { key, values in
-                components?.queryItems = [
-                    URLQueryItem(name: "bucket", value: bucket),
-                    URLQueryItem(name: "org", value: org),
-                    URLQueryItem(name: "precision", value: key.rawValue)
-                ]
-
-                // Body
-                let body: Data! = values.1.joined(separator: "\n").data(using: .utf8)
-
-                client.httpPost(
-                        components,
-                        "text/plain; charset=utf-8",
-                        "application/json",
-                        InfluxDBClient.GZIPMode.request,
-                        body,
-                        responseQueue) { result -> Void in
-                    switch result {
-                    case .success:
-                        completion(.success(()))
-                    case let .failure(error):
-                        completion(.failure(error))
-                    }
+            client.httpPost(
+                components,
+                "text/plain; charset=utf-8",
+                "application/json",
+                InfluxDBClient.GZIPMode.request,
+                body,
+                responseQueue) { result -> Void in
+                switch result {
+                case .success:
+                    completion(.success(()))
+                case let .failure(error):
+                    completion(.failure(error))
                 }
             }
         } catch {
-            responseQueue.async {
-                completion(.failure(InfluxDBClient.InfluxDBError.error(415, nil, nil, error)))
-            }
+            completion(.failure(.cause(error)))
         }
     }
 
-    private func toLineProtocol(precision: InfluxDBClient.TimestampPrecision,
-                                any: Any,
-                                defaultTags: [String: String?]?,
-                                batches: inout [InfluxDBClient.TimestampPrecision: (Int, [String])]) throws {
-        // To avoid: "Could not cast value of type 'InfluxDBSwift.InfluxDBClient.Point' to 'Foundation.NSObject'."
-        // on Linux - see:
-        // https://app.circleci.com/pipelines/github/influxdata
-        // /influxdb-client-swift/315/workflows/8467a324-6bbf-47ca-a2cf-6ff9d820385d/jobs/1042
-        if type(of: any) == InfluxDBClient.Point.self {
-            if let point = any as? InfluxDBClient.Point {
-                try toLineProtocol(precision: precision, point: point, defaultTags: defaultTags, batches: &batches)
-            }
-        } else {
-            switch any {
-            case let string as String:
-                try toLineProtocol(precision: precision, record: string, defaultTags: defaultTags, batches: &batches)
-            case let tuple as InfluxDBClient.Point.Tuple:
-                let point = InfluxDBClient.Point.fromTuple(tuple)
-                try toLineProtocol(precision: precision, point: point, defaultTags: defaultTags, batches: &batches)
-            case let array as [Any]:
-                try array.forEach { item in
-                    try toLineProtocol(precision: precision, any: item, defaultTags: defaultTags, batches: &batches)
-                }
-            default:
-                throw InfluxDBClient.InfluxDBError
-                        .generic("Record type is not supported: \(any) with type: \(type(of: any))")
-            }
+    private func toLineProtocol(records: [InfluxDBClient.Point],
+                                precision: InfluxDBClient.TimestampPrecision,
+                                defaultTags: [String: String?]?) throws -> [String] {
+        try records.compactMap { point in
+            try point.toLineProtocol(precision: precision, defaultTags: defaultTags)
         }
     }
 
-    private func toLineProtocol(precision: InfluxDBClient.TimestampPrecision,
-                                point: InfluxDBClient.Point,
-                                defaultTags: [String: String?]?,
-                                batches: inout [InfluxDBClient.TimestampPrecision: (Int, [String])]) throws {
-        if let lineProtocol = try point.toLineProtocol(defaultTags: defaultTags) {
-            let pointPrecision = point.time?.precision ?? InfluxDBClient.defaultTimestampPrecision
-            return try toLineProtocol(
-                    precision: pointPrecision,
-                    record: lineProtocol,
-                    defaultTags: defaultTags,
-                    batches: &batches)
-        }
-    }
-
-    private func toLineProtocol(precision: InfluxDBClient.TimestampPrecision,
-                                record: String,
-                                defaultTags: [String: String?]?,
-                                batches: inout [InfluxDBClient.TimestampPrecision: (Int, [String])]) throws {
-        guard !record.trimmingCharacters(in: .whitespaces).isEmpty else {
-            return
-        }
-        if var batch = batches[precision] {
-            batch.1.append(record)
-            batches[precision] = batch
-        } else {
-            batches[precision] = (batches.count, [record])
-        }
-    }
     // swiftlint:enable function_parameter_count
 }

@@ -69,18 +69,28 @@ extension InfluxDBClient {
         /// Creates Line Protocol from Data Point.
         ///
         /// - Parameters:
+        ///   - precision: the precision to use for the generated line protocol
         ///   - defaultTags: default tags for Point.
         /// - Returns: Line Protocol
-        public func toLineProtocol(defaultTags: [String: String?]? = nil) throws -> String? {
+        public func toLineProtocol(precision: TimestampPrecision = defaultTimestampPrecision, defaultTags: [String: String?]? = nil) throws -> String? {
             let meas = escapeKey(measurement, false)
             let tags = escapeTags(defaultTags)
             let fields = try escapeFields()
             guard !fields.isEmpty else {
                 return nil
             }
-            let time = escapeTime()
 
-            return "\(meas)\(tags) \(fields)\(time)"
+            var res = meas
+            res.append(tags)
+            res.append(" ")
+            res.append(fields)
+
+            if let time = time {
+                res.append(" ")
+                res.append(String(time.toUInt64(precision: precision)))
+            }
+
+            return res
         }
     }
 
@@ -132,34 +142,42 @@ extension InfluxDBClient.Point {
         init(_ value: Int8) {
             self = .int(Int(value))
         }
+
         /// Support for Int16
         init(_ value: Int16) {
             self = .int(Int(value))
         }
+
         /// Support for Int32
         init(_ value: Int32) {
             self = .int(Int(value))
         }
+
         /// Support for Int64
         init(_ value: Int64) {
             self = .int(Int(value))
         }
+
         /// Support for UInt8
         init(_ value: UInt8) {
             self = .uint(UInt(value))
         }
+
         /// Support for UInt16
         init(_ value: UInt16) {
             self = .uint(UInt(value))
         }
+
         /// Support for UInt32
         init(_ value: UInt32) {
             self = .uint(UInt(value))
         }
+
         /// Support for UInt64
         init(_ value: UInt64) {
             self = .uint(UInt(value))
         }
+
         /// Support for Float
         init(_ value: Float) {
             self = .double(Double(value))
@@ -180,25 +198,58 @@ extension InfluxDBClient.Point {
     /// Possible value types of Field
     public enum TimestampValue: CustomStringConvertible {
         // The number of ticks since the UNIX epoch. The value has to be specified with correct precision.
-        case interval(Int, InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision)
+        case interval(Int, InfluxDBClient.TimestampPrecision)
         // The date timestamp.
-        case date(Date, InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision)
+        case date(Date)
 
         public var description: String {
             switch self {
             case let .interval(ticks, precision):
                 return "\(ticks) [\(precision)]"
-            case let .date(date, precision):
-                return "\(date) [\(precision)]"
+            case let .date(date):
+                return "\(date)"
             }
         }
 
-        public var precision: InfluxDBClient.TimestampPrecision {
+        public func toUInt64(precision out: InfluxDBClient.TimestampPrecision) -> UInt64 {
             switch self {
-            case let .interval(_, precision):
-                return precision
-            case let .date(_, precision):
-                return precision
+            case let .interval(ticks, precision):
+                var multiplier: UInt64
+                switch precision {
+                case .s:
+                    multiplier = 1_000_000_000
+                case .ms:
+                    multiplier = 1_000_000
+                case .us:
+                    multiplier = 1_000
+                case .ns:
+                    multiplier = 1
+                }
+                switch out {
+                case .s:
+                    multiplier /= 1_000_000_000
+                case .ms:
+                    multiplier /= 1_000_000
+                case .us:
+                    multiplier /= 1_000
+                case .ns:
+                    multiplier /= 1
+                }
+                return UInt64(ticks) * multiplier
+
+            case let .date(date):
+                let multiplier: Double
+                switch out {
+                case .s:
+                    multiplier = 1
+                case .ms:
+                    multiplier = 1e3
+                case .us:
+                    multiplier = 1e6
+                case .ns:
+                    multiplier = 1e9
+                }
+                return UInt64(date.timeIntervalSince1970 * multiplier)
             }
         }
     }
@@ -265,53 +316,48 @@ extension InfluxDBClient.Point {
 
     private func escapeTags(_ defaultTags: [String: String?]?) -> String {
         tags
-                .merging(defaultTags ?? [:]) { current, _ in
-                    current
+            .merging(defaultTags ?? [:]) { current, _ in
+                current
+            }
+            .sorted {
+                $0.key < $1.key
+            }
+            .reduce(into: "") { result, keyValue in
+                guard !keyValue.key.isEmpty else {
+                    return
                 }
-                .sorted {
-                    $0.key < $1.key
-                }.reduce(into: "") { result, keyValue in
-                    guard !keyValue.key.isEmpty else {
-                        return
-                    }
-                    if let value = keyValue.value, !value.isEmpty {
-                        result.append(",")
-                        result.append(escapeKey(keyValue.key))
-                        result.append("=")
-                        result.append(escapeKey(value))
-                    }
+                if let value = keyValue.value, !value.isEmpty {
+                    result.append(",")
+                    result.append(escapeKey(keyValue.key))
+                    result.append("=")
+                    result.append(escapeKey(value))
                 }
+            }
     }
 
     private func escapeFields() throws -> String {
-        var mappedFields = try fields.sorted {
-            $0.key < $1.key
-        }.reduce(into: "") { result, keyValue in
-            if keyValue.key.isEmpty {
-                return
+        try fields
+            .sorted {
+                $0.key < $1.key
             }
-            guard let value = keyValue.value else {
-                return
-            }
-            if let escaped = try escapeValue(value) {
-                // key
-                result.append(escapeKey(keyValue.key))
-                // key=
-                result.append("=")
-                // key=value
-                result.append(escaped)
-                // key=value,
-                result.append(",")
-            }
-        }
+            .compactMap { (kv) -> String? in
+                guard
+                    !kv.key.isEmpty,
+                    let val = kv.value
+                    else {
+                    return nil
+                }
 
-        if !mappedFields.isEmpty {
-            _ = mappedFields.removeLast()
-        }
-        return mappedFields
+                var res = escapeKey(kv.key)
+                res.append("=")
+                res.append(try escapeValue(val))
+
+                return res
+            }
+            .joined(separator: ",")
     }
 
-    private func escapeValue(_ value: FieldValue) throws -> String? {
+    private func escapeValue(_ value: FieldValue) throws -> String {
         switch value {
         case .int(let value):
             return "\(value)i"
@@ -319,7 +365,7 @@ extension InfluxDBClient.Point {
             return "\(value)u"
         case .double(let value):
             if value.isInfinite || value.isNaN {
-                return nil
+                throw InfluxDBClient.InfluxDBError.generic("double is infinite or NaN")
             }
             return "\(value)"
         case .boolean(let value):
@@ -337,27 +383,10 @@ extension InfluxDBClient.Point {
             return "\"\(escaped)\""
         }
     }
+}
 
-    private func escapeTime() -> String {
-        guard let time = time else {
-            return ""
-        }
-
-        switch time {
-        case let .interval(ticks, _):
-            return " \(ticks)"
-        case let .date(date, precision):
-            let since1970 = date.timeIntervalSince1970
-            switch precision {
-            case .s:
-                return " \(UInt64(since1970))"
-            case .ms:
-                return " \(UInt64(since1970 * 1_000))"
-            case .us:
-                return " \(UInt64(since1970 * 1_000_000))"
-            default:
-                return " \(UInt64(since1970 * 1_000_000_000))"
-            }
-        }
+extension String.StringInterpolation {
+    mutating func appendInterpolation(value: InfluxDBClient.Point.TimestampValue, precision out: InfluxDBClient.TimestampPrecision = InfluxDBClient.defaultTimestampPrecision) {
+        appendLiteral(String(value.toUInt64(precision: out)))
     }
 }
